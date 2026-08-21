@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% from "icons.html" import icon %}
+{% block title %}หน้าหลัก | ระบบจองห้องเรียน{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="hero-copy">
+        <span class="eyebrow">{{ icon('spark', 16) }} จองง่าย • เช็กสถานะได้ทันที</span>
+        <h1>เลือกอาคาร แล้วจองห้อง<br><span>สำหรับวันนี้</span></h1>
+        <p>คิวจองจะเริ่มใหม่อัตโนมัติเมื่อขึ้นวันใหม่ โดยข้อมูลเก่ายังคงเก็บในประวัติครบถ้วน</p>
+    </div>
+    <div class="date-card">
+        <span class="date-icon">{{ icon('calendar', 24) }}</span>
+        <div><small>วันที่เปิดจอง</small><strong>{{ today_thai }}</strong></div>
+    </div>
+</section>
+
+<section class="stats-grid" aria-label="สรุปสถานะวันนี้">
+    <div class="stat-card"><span>{{ icon('building', 20) }}</span><div><strong>{{ buildings|length }}</strong><small>อาคาร/พื้นที่</small></div></div>
+    <div class="stat-card"><span>{{ icon('door', 20) }}</span><div><strong>{{ total_rooms }}</strong><small>ห้องทั้งหมด</small></div></div>
+    <div class="stat-card"><span class="status-green">{{ icon('check', 20) }}</span><div><strong>{{ available_today }}</strong><small>ว่างวันนี้</small></div></div>
+    <div class="stat-card"><span class="status-red">{{ icon('calendar', 20) }}</span><div><strong>{{ booked_today }}</strong><small>ถูกจองวันนี้</small></div></div>
+</section>
+
+<section class="section-head">
+    <div><span class="section-kicker">อาคารเรียน</span><h2>เลือกพื้นที่ที่ต้องการ</h2></div>
+    <p>{{ buildings|length }} พื้นที่พร้อมตรวจสอบสถานะ</p>
+</section>
+
+<div class="building-grid">
+{% for building, room_items in buildings.items() %}
+    <a class="building-card" href="{{ url_for('rooms', building=building) }}">
+        <span class="building-icon">{{ icon('building', 24) }}</span>
+        <div class="building-body">
+            <h3>{{ building }}</h3>
+            <p>{{ room_items|length }} ห้อง</p>
+        </div>
+        <span class="round-arrow">{{ icon('arrow', 18) }}</span>
+    </a>
+{% endfor %}
+</div>
+{% endblock %}

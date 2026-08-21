@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% from "icons.html" import icon %}
+{% block title %}รายการจอง | ระบบจองห้องเรียน{% endblock %}
+{% block content %}
+<div class="page-head bookings-head">
+    <div>
+        <span class="section-kicker">รายการและประวัติ</span>
+        <h1>การจองห้องเรียน</h1>
+        <p>รายการวันนี้แยกจากประวัติย้อนหลังโดยอัตโนมัติ</p>
+    </div>
+    {% if my_active_count %}<div class="day-chip owner-chip">{{ icon('user', 18) }} <span>ของคุณ {{ my_active_count }} รายการ</span></div>{% endif %}
+</div>
+
+<section class="booking-section">
+    <div class="section-title-row"><div><h2>วันนี้</h2><p>{{ today_thai }} • {{ active_today|length }} รายการ</p></div><span class="live-dot"><i></i>ปัจจุบัน</span></div>
+
+    {% if active_today %}
+    <div class="booking-list">
+        {% for booking in active_today %}
+        <article class="booking-row {% if booking.can_cancel %}owned{% endif %}">
+            <div class="booking-room"><span class="room-icon small">{{ icon('door', 19) }}</span><div><strong>{{ booking.room }}</strong><small>{{ booking.building }}</small></div></div>
+            <div class="booking-detail"><span>{{ icon('user', 16) }}</span><div><small>ผู้จอง</small><strong>{{ booking.name }}</strong></div></div>
+            <div class="booking-detail"><span>{{ icon('clock', 16) }}</span><div><small>เวลา</small><strong>{{ booking.start_time }} - {{ booking.end_time }}</strong></div></div>
+            <div class="booking-actions">
+                {% if booking.can_cancel %}
+                    <span class="owner-label">ของคุณ</span>
+                    <form method="POST" action="{{ url_for('cancel_booking', booking_id=booking.id) }}" data-confirm-cancel>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-danger btn-small">{{ icon('trash', 16) }} ยกเลิก</button>
+                    </form>
+                {% else %}
+                    <span class="locked-label">{{ icon('lock', 15) }} ยกเลิกไม่ได้</span>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">{{ icon('calendar', 30) }}<h3>ยังไม่มีการจองวันนี้</h3><p>เลือกอาคารและห้องที่ต้องการเพื่อเริ่มจอง</p><a href="{{ url_for('home') }}" class="btn btn-primary">เลือกห้อง</a></div>
+    {% endif %}
+</section>
+
+<section class="booking-section history-section">
+    <div class="section-title-row"><div><h2>ประวัติย้อนหลัง</h2><p>ข้อมูลไม่ถูกลบเมื่อเปลี่ยนวันหรือยกเลิก</p></div><span class="history-icon">{{ icon('history', 19) }}</span></div>
+
+    {% if history %}
+    <div class="history-table-wrap">
+        <table class="history-table">
+            <thead><tr><th>ห้อง</th><th>ผู้จอง</th><th>วันที่</th><th>เวลา</th><th>สถานะ</th></tr></thead>
+            <tbody>
+            {% for booking in history %}
+                <tr>
+                    <td><strong>{{ booking.room }}</strong><small>{{ booking.building }}</small></td>
+                    <td>{{ booking.name }}</td>
+                    <td>{{ booking.thai_booking_date }}</td>
+                    <td>{{ booking.start_time }} - {{ booking.end_time }}</td>
+                    <td>{% if booking.status == 'cancelled' %}<span class="history-status cancelled">ยกเลิกแล้ว</span>{% else %}<span class="history-status completed">สิ้นสุดแล้ว</span>{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-inline">{{ icon('history', 20) }} ยังไม่มีข้อมูลย้อนหลัง</div>
+    {% endif %}
+</section>
+{% endblock %}

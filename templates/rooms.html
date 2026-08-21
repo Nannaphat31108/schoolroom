@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% from "icons.html" import icon %}
+{% block title %}{{ building }} | ระบบจองห้องเรียน{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <a class="back-link" href="{{ url_for('home') }}">{{ icon('back', 17) }} กลับหน้าหลัก</a>
+        <span class="section-kicker">สถานะห้องวันนี้</span>
+        <h1>{{ building }}</h1>
+        <p>{{ today }} • ว่าง {{ available_count }} จาก {{ rooms|length }} ห้อง</p>
+    </div>
+    <div class="day-chip">{{ icon('calendar', 18) }} <span>จองเฉพาะวันนี้</span></div>
+</div>
+
+<div class="room-grid">
+{% for room in rooms %}
+    <article class="room-card {% if room.status != 'ว่าง' %}occupied{% endif %}">
+        <div class="room-card-top">
+            <span class="room-icon">{{ icon('door', 21) }}</span>
+            {% if room.status == "ว่าง" %}
+                <span class="status-badge available"><i></i>ว่าง</span>
+            {% else %}
+                <span class="status-badge busy"><i></i>ไม่ว่าง</span>
+            {% endif %}
+        </div>
+        <h3>{{ room.room }}</h3>
+        {% if room.status == "ว่าง" %}
+            <p class="room-note">พร้อมให้จองสำหรับวันนี้</p>
+            <a href="{{ url_for('booking', building=building, room=room.room) }}" class="btn btn-primary btn-block">
+                จองห้อง {{ icon('arrow', 17) }}
+            </a>
+        {% else %}
+            <div class="booking-meta">
+                <span>{{ icon('user', 16) }} {{ room.name }}</span>
+                <span>{{ icon('clock', 16) }} {{ room.start_time }} - {{ room.end_time }}</span>
+            </div>
+            <button class="btn btn-disabled btn-block" disabled>{{ icon('lock', 16) }} ถูกจองแล้ว</button>
+        {% endif %}
+    </article>
+{% endfor %}
+</div>
+{% endblock %}

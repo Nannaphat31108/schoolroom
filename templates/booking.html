@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+{% from "icons.html" import icon %}
+{% block title %}จองห้อง {{ room }} | ระบบจองห้องเรียน{% endblock %}
+{% block content %}
+<div class="form-layout">
+    <section class="form-panel">
+        <a class="back-link" href="{{ url_for('rooms', building=building) }}">{{ icon('back', 17) }} กลับไปเลือกห้อง</a>
+        <span class="section-kicker">ยืนยันข้อมูลการจอง</span>
+        <h1>จองห้อง {{ room }}</h1>
+        <p class="form-lead">{{ building }} • การจองนี้มีผลเฉพาะวันที่ {{ today }}</p>
+
+        <form method="POST" class="booking-form" autocomplete="on">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="field">
+                <label for="name">ชื่อผู้จอง</label>
+                <div class="input-wrap">{{ icon('user', 18) }}<input id="name" type="text" name="name" value="{{ request.form.get('name', '') }}" placeholder="กรอกชื่อผู้จอง" minlength="2" maxlength="100" required autofocus></div>
+            </div>
+
+            <div class="two-cols">
+                <div class="field">
+                    <label for="start">เวลาเริ่ม</label>
+                    <div class="input-wrap">{{ icon('clock', 18) }}<input id="start" type="time" name="start" value="{{ request.form.get('start', '') }}" required></div>
+                </div>
+                <div class="field">
+                    <label for="end">เวลาสิ้นสุด</label>
+                    <div class="input-wrap">{{ icon('clock', 18) }}<input id="end" type="time" name="end" value="{{ request.form.get('end', '') }}" required></div>
+                </div>
+            </div>
+
+            <div class="info-box">{{ icon('info', 18) }}<span>เมื่อจองสำเร็จ ห้องจะถูกล็อกสำหรับวันนี้ และจะว่างใหม่อัตโนมัติเมื่อเข้าสู่วันถัดไป</span></div>
+            <button type="submit" class="btn btn-primary btn-large btn-block">{{ icon('check', 18) }} ยืนยันการจอง</button>
+        </form>
+    </section>
+
+    <aside class="summary-panel">
+        <span class="summary-icon">{{ icon('calendar', 26) }}</span>
+        <small>สรุปการจอง</small>
+        <h2>{{ room }}</h2>
+        <dl>
+            <div><dt>อาคาร</dt><dd>{{ building }}</dd></div>
+            <div><dt>วันที่</dt><dd>{{ today }}</dd></div>
+            <div><dt>สถานะ</dt><dd><span class="status-badge available"><i></i>พร้อมจอง</span></dd></div>
+        </dl>
+        <div class="security-note">{{ icon('shield', 18) }}<span>คุณจะยกเลิกได้เฉพาะรายการที่จองจากอุปกรณ์/เบราว์เซอร์นี้</span></div>
+    </aside>
+</div>
+{% endblock %}

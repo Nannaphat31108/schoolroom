@@ -1,0 +1,71 @@
+{% from "icons.html" import icon %}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="color-scheme" content="light">
+    <title>{% block title %}ระบบจองห้องเรียน{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+    <div class="shell topbar-inner">
+        <a class="brand" href="{{ url_for('home') }}" aria-label="กลับหน้าหลัก">
+            <span class="brand-mark">{{ icon('school', 24) }}</span>
+            <span>
+                <strong>Room Booking</strong>
+                <small>ระบบจองห้องเรียน</small>
+            </span>
+        </a>
+
+        <nav class="nav-actions" aria-label="เมนูหลัก">
+            <a class="nav-link {% if request.endpoint == 'home' %}active{% endif %}" href="{{ url_for('home') }}">
+                {{ icon('home', 18) }}<span>หน้าหลัก</span>
+            </a>
+            <a class="nav-link {% if request.endpoint == 'bookings' %}active{% endif %}" href="{{ url_for('bookings') }}">
+                {{ icon('list', 18) }}<span>รายการจอง</span>
+            </a>
+        </nav>
+    </div>
+</header>
+
+<main class="shell main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-stack" aria-live="polite">
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">
+                        <span class="flash-icon">{{ icon('check' if category == 'success' else 'info', 18) }}</span>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+    <div class="shell footer-inner">
+        <span>ระบบจองห้องเรียน</span>
+        <span class="dot">•</span>
+        <span>{{ today_thai }}</span>
+    </div>
+</footer>
+
+<dialog id="confirmDialog" class="confirm-dialog">
+    <div class="dialog-icon">{{ icon('trash', 22) }}</div>
+    <h3>ยกเลิกการจอง?</h3>
+    <p>รายการจะเปลี่ยนเป็น “ยกเลิกแล้ว” และยังคงเก็บไว้ในประวัติ</p>
+    <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" data-dialog-close>กลับ</button>
+        <button type="button" class="btn btn-danger" data-dialog-confirm>ยืนยันยกเลิก</button>
+    </div>
+</dialog>
+
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
