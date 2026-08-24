@@ -9,7 +9,7 @@
     <title>{% block title %}ระบบจองห้องเรียน{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+<body{% if request.endpoint in ['home', 'rooms', 'bookings'] %} data-live-bookings data-live-url="{{ url_for('live_bookings') }}"{% endif %}>
 <header class="topbar">
     <div class="shell topbar-inner">
         <a class="brand" href="{{ url_for('home') }}" aria-label="กลับหน้าหลัก">
@@ -66,6 +66,6 @@
     </div>
 </dialog>
 
-<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=1.0.3-render-fix" defer></script>
 </body>
 </html>

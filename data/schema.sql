@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS booking (
     owner_id TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT,
-    cancelled_at TEXT
+    cancelled_at TEXT,
+    completed_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_booking_day

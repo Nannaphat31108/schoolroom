@@ -14,7 +14,7 @@
 
 <div class="room-grid">
 {% for room in rooms %}
-    <article class="room-card {% if room.status != 'ว่าง' %}occupied{% endif %}">
+    <article class="room-card {% if room.status != 'ว่าง' %}occupied{% endif %}"{% if room.status != 'ว่าง' %} data-active-room-key="{{ building }}::{{ room.room }}"{% endif %}{% if room.release_after_ms %} data-auto-release-ms="{{ room.release_after_ms }}"{% endif %}>
         <div class="room-card-top">
             <span class="room-icon">{{ icon('door', 21) }}</span>
             {% if room.status == "ว่าง" %}
@@ -34,6 +34,7 @@
                 <span>{{ icon('user', 16) }} {{ room.name }}</span>
                 <span>{{ icon('clock', 16) }} {{ room.start_time }} - {{ room.end_time }}</span>
             </div>
+            <p class="auto-release-note">{{ icon('check', 15) }} ห้องจะว่างอัตโนมัติเมื่อถึง {{ room.end_time }}</p>
             <button class="btn btn-disabled btn-block" disabled>{{ icon('lock', 16) }} ถูกจองแล้ว</button>
         {% endif %}
     </article>

@@ -1,4 +1,4 @@
-from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
 import os
 import secrets
 import sqlite3
@@ -10,6 +10,8 @@ DATA_DIR = APP_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", DATA_DIR / "database.db"))
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+# ประเทศไทยใช้ UTC+7 ตลอดปีและไม่มี Daylight Saving Time
+# ใช้ fixed offset เพื่อให้รันบน Windows/Python ที่ไม่มี tzdata ได้ทันที
 BANGKOK_TZ = timezone(timedelta(hours=7), name="Asia/Bangkok")
 
 def load_secret_key():
@@ -32,6 +34,8 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
+
+# เปิด Secure cookie อัตโนมัติเมื่อ deploy ผ่าน HTTPS
 @app.before_request
 def prepare_request():
     if request.headers.get("X-Forwarded-Proto", request.scheme) == "https":
@@ -51,12 +55,38 @@ def inject_globals():
         "today_thai": thai_date(),
     }
 
+
+# --------------------------
+# วันที่ / เวลา
+# --------------------------
 def now_bangkok():
     return datetime.now(BANGKOK_TZ)
 
 
 def today_iso():
     return now_bangkok().date().isoformat()
+
+
+def parse_time_text(value):
+    """รองรับทั้ง 08:30, 8:30 และ 08:30:00 จากฐานข้อมูลเก่า"""
+    value = (value or "").strip()
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
+            pass
+    return None
+
+
+def booking_end_datetime(booking_date, end_time):
+    try:
+        day = datetime.strptime((booking_date or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    end_obj = parse_time_text(end_time)
+    if end_obj is None:
+        return None
+    return datetime.combine(day, end_obj, tzinfo=BANGKOK_TZ)
 
 
 def thai_date(value=None):
@@ -87,6 +117,10 @@ def parse_legacy_thai_date(value):
     except (ValueError, KeyError, AttributeError):
         return None
 
+
+# --------------------------
+# รายชื่ออาคารและห้องเรียน
+# --------------------------
 buildings = {
     "อาคาร 1": ["111", "112", "113", "114", "115", "116", "117", "121", "122", "123", "124", "125", "126", "127"],
     "อาคาร 3": ["ห้องแลป", "311", "312", "313", "314", "315", "321", "322", "323", "324", "325", "331", "332", "333", "334", "335"],
@@ -104,6 +138,10 @@ buildings = {
 def room_exists(building, room):
     return building in buildings and room in buildings[building]
 
+
+# --------------------------
+# Database
+# --------------------------
 def connect_db():
     conn = sqlite3.connect(str(DATABASE_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
@@ -131,10 +169,12 @@ def create_table():
             owner_id TEXT,
             status TEXT NOT NULL DEFAULT 'active',
             created_at TEXT,
-            cancelled_at TEXT
+            cancelled_at TEXT,
+            completed_at TEXT
         )
     """)
 
+    # Migration สำหรับ database เดิมที่เป็น Demo
     columns = table_columns(conn, "booking")
     migrations = {
         "booking_date": "ALTER TABLE booking ADD COLUMN booking_date TEXT",
@@ -142,11 +182,13 @@ def create_table():
         "status": "ALTER TABLE booking ADD COLUMN status TEXT NOT NULL DEFAULT 'active'",
         "created_at": "ALTER TABLE booking ADD COLUMN created_at TEXT",
         "cancelled_at": "ALTER TABLE booking ADD COLUMN cancelled_at TEXT",
+        "completed_at": "ALTER TABLE booking ADD COLUMN completed_at TEXT",
     }
     for column, sql in migrations.items():
         if column not in columns:
             conn.execute(sql)
 
+    # ย้ายวันที่แบบภาษาไทยเดิม -> YYYY-MM-DD เพื่อให้กรองตามวันได้จริง
     legacy_rows = conn.execute(
         "SELECT id, date FROM booking WHERE booking_date IS NULL OR booking_date=''"
     ).fetchall()
@@ -161,6 +203,7 @@ def create_table():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_booking_day ON booking(booking_date, building, room, status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_booking_owner ON booking(owner_id, booking_date)")
 
+    # ห้องหนึ่งมีรายการ active ได้เพียง 1 รายการต่อวัน ป้องกันกดจองชนกันพร้อมกัน
     try:
         conn.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS uq_booking_room_day_active
@@ -168,6 +211,7 @@ def create_table():
             WHERE status='active' AND booking_date IS NOT NULL
         """)
     except sqlite3.IntegrityError:
+        # รองรับ DB เก่าที่มีข้อมูลซ้ำ: เก็บรายการแรกเป็น active ที่เหลือย้ายเป็น cancelled
         duplicates = conn.execute("""
             SELECT building, room, booking_date
             FROM booking
@@ -199,6 +243,59 @@ def create_table():
 create_table()
 
 
+def sync_expired_bookings():
+    """
+    ปิดรายการหมดเวลาด้วย datetime จริงแทนการเทียบข้อความใน SQL
+    จึงทำงานเหมือนกันทั้ง Windows, Linux/Render และรองรับ DB รุ่นเก่าที่เวลาเป็น 8:30
+    """
+    now = now_bangkok()
+    conn = connect_db()
+    rows = conn.execute(
+        """
+        SELECT id, booking_date, end_time
+        FROM booking
+        WHERE status='active' AND booking_date IS NOT NULL
+        """
+    ).fetchall()
+
+    expired = []
+    for row in rows:
+        end_dt = booking_end_datetime(row["booking_date"], row["end_time"])
+        if end_dt is not None and end_dt <= now:
+            expired.append((end_dt.isoformat(timespec="seconds"), row["id"]))
+
+    if expired:
+        conn.executemany(
+            """
+            UPDATE booking
+            SET status='completed', completed_at=COALESCE(completed_at, ?)
+            WHERE id=? AND status='active'
+            """,
+            expired,
+        )
+        conn.commit()
+
+    conn.close()
+    return len(expired)
+
+
+@app.before_request
+def auto_complete_expired_bookings():
+    # ไม่แตะฐานข้อมูลตอน browser โหลด CSS/JS เพื่อลดงานที่ไม่จำเป็น
+    if request.endpoint != "static":
+        sync_expired_bookings()
+
+
+def release_after_ms(booking_date, end_time):
+    """เวลาที่เหลือก่อนห้องว่าง ใช้ให้หน้าเว็บตรวจสถานะตรงเวลาสิ้นสุด"""
+    if not booking_date or booking_date != today_iso() or not end_time:
+        return 0
+    end_dt = booking_end_datetime(booking_date, end_time)
+    if end_dt is None:
+        return 0
+    return max(0, int((end_dt - now_bangkok()).total_seconds() * 1000))
+
+
 def verify_csrf():
     token = request.form.get("csrf_token", "")
     if not token or not secrets.compare_digest(token, session.get("csrf_token", "")):
@@ -214,17 +311,25 @@ def booking_to_dict(row):
         and item.get("status") == "active"
         and item.get("booking_date") == today_iso()
     )
+    item["release_after_ms"] = release_after_ms(item.get("booking_date"), item.get("end_time"))
     return item
 
+
+# --------------------------
+# หน้าแรก
+# --------------------------
 @app.route("/")
 def home():
     total_rooms = sum(len(items) for items in buildings.values())
     conn = connect_db()
-    booked_today = conn.execute(
-        "SELECT COUNT(*) AS total FROM booking WHERE booking_date=? AND status='active'",
+    active_rows = conn.execute(
+        "SELECT id, building, room, end_time FROM booking WHERE booking_date=? AND status='active'",
         (today_iso(),),
-    ).fetchone()["total"]
+    ).fetchall()
     conn.close()
+    booked_today = len(active_rows)
+    release_times = [release_after_ms(today_iso(), row["end_time"]) for row in active_rows]
+    release_times = [ms for ms in release_times if ms > 0]
 
     return render_template(
         "index.html",
@@ -232,7 +337,13 @@ def home():
         total_rooms=total_rooms,
         booked_today=booked_today,
         available_today=max(total_rooms - booked_today, 0),
+        nearest_release_ms=min(release_times) if release_times else 0,
     )
+
+
+# --------------------------
+# แสดงห้องของอาคาร (เฉพาะการจองวันนี้)
+# --------------------------
 @app.route("/building/<building>")
 def rooms(building):
     if building not in buildings:
@@ -258,6 +369,7 @@ def rooms(building):
             "name": book["name"] if book else "-",
             "start_time": book["start_time"] if book else "",
             "end_time": book["end_time"] if book else "",
+            "release_after_ms": release_after_ms(book["booking_date"], book["end_time"]) if book else 0,
         })
 
     return render_template(
@@ -268,6 +380,10 @@ def rooms(building):
         available_count=sum(1 for room in room_list if room["status"] == "ว่าง"),
     )
 
+
+# --------------------------
+# จองห้อง - จองได้เฉพาะวันปัจจุบัน
+# --------------------------
 @app.route("/booking/<building>/<room>", methods=["GET", "POST"])
 def booking(building, room):
     if not room_exists(building, room):
@@ -283,18 +399,33 @@ def booking(building, room):
             flash("กรุณากรอกชื่อผู้จอง 2-100 ตัวอักษร", "error")
             return render_template("booking.html", building=building, room=room, today=thai_date())
 
-        try:
-            start_obj = datetime.strptime(start, "%H:%M").time()
-            end_obj = datetime.strptime(end, "%H:%M").time()
-        except ValueError:
+        start_obj = parse_time_text(start)
+        end_obj = parse_time_text(end)
+        if start_obj is None or end_obj is None:
             flash("รูปแบบเวลาไม่ถูกต้อง", "error")
             return render_template("booking.html", building=building, room=room, today=thai_date())
+
+        # บันทึกให้เป็น HH:MM เสมอ ป้องกันข้อมูลต่างรูปแบบระหว่างเครื่องกับ Render
+        start = start_obj.strftime("%H:%M")
+        end = end_obj.strftime("%H:%M")
 
         if start_obj >= end_obj:
             flash("เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม", "error")
             return render_template("booking.html", building=building, room=room, today=thai_date())
 
-        booking_day = today_iso()
+        now = now_bangkok()
+        booking_day = now.date().isoformat()
+        start_dt = datetime.combine(now.date(), start_obj, tzinfo=BANGKOK_TZ)
+        end_dt = datetime.combine(now.date(), end_obj, tzinfo=BANGKOK_TZ)
+        # อนุญาตนาทีปัจจุบัน แต่ห้ามเลือกนาทีที่ผ่านไปแล้ว
+        now_minute = now.replace(second=0, microsecond=0)
+        if start_dt < now_minute:
+            flash("เวลาเริ่มต้องเป็นเวลาปัจจุบันหรือหลังจากนี้", "error")
+            return render_template("booking.html", building=building, room=room, today=thai_date())
+        if end_dt <= now:
+            flash("เวลาสิ้นสุดต้องเป็นเวลาหลังจากเวลาปัจจุบัน", "error")
+            return render_template("booking.html", building=building, room=room, today=thai_date())
+
         created_at = now_bangkok().isoformat(timespec="seconds")
         conn = connect_db()
         try:
@@ -319,13 +450,15 @@ def booking(building, room):
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()
-            flash("ห้องนี้มีผู้จองสำหรับวันนี้แล้ว กรุณาเลือกห้องอื่น", "error")
+            flash("ห้องนี้ยังมีรายการจองที่ไม่หมดเวลา กรุณารอเวลาสิ้นสุดหรือเลือกห้องอื่น", "error")
             return redirect(url_for("rooms", building=building))
         finally:
             conn.close()
 
         flash(f"จองห้อง {room} สำเร็จ", "success")
         return redirect(url_for("bookings"))
+
+    # ป้องกันเปิดหน้าจองห้องที่ถูกจองแล้วจาก URL โดยตรง
     conn = connect_db()
     exists = conn.execute(
         """
@@ -337,11 +470,15 @@ def booking(building, room):
     ).fetchone()
     conn.close()
     if exists:
-        flash("ห้องนี้มีผู้จองแล้วในวันนี้", "error")
+        flash("ห้องนี้ยังไม่หมดเวลาการจอง เมื่อถึงเวลาสิ้นสุดจะว่างอัตโนมัติ", "error")
         return redirect(url_for("rooms", building=building))
 
     return render_template("booking.html", building=building, room=room, today=thai_date())
 
+
+# --------------------------
+# รายการจองทั้งหมด + ประวัติย้อนหลัง
+# --------------------------
 @app.route("/bookings")
 def bookings():
     conn = connect_db()
@@ -356,8 +493,12 @@ def bookings():
     conn.close()
 
     data = [booking_to_dict(row) for row in rows]
-    active_today = [item for item in data if item["is_today"] and item["status"] == "active"]
-    history = [item for item in data if not (item["is_today"] and item["status"] == "active")]
+    active_today = [
+        item for item in data
+        if item["is_today"] and item["status"] == "active"
+    ]
+    active_ids = {item["id"] for item in active_today}
+    history = [item for item in data if item["id"] not in active_ids]
 
     return render_template(
         "bookings.html",
@@ -366,6 +507,60 @@ def bookings():
         my_active_count=sum(1 for item in active_today if item["can_cancel"]),
     )
 
+
+# --------------------------
+# API สถานะสด - ใช้ให้หน้าเว็บปล่อยห้องทันทีเมื่อหมดเวลา
+# --------------------------
+@app.route("/api/live-bookings")
+def live_bookings():
+    # before_request จะ sync รายการหมดเวลาให้แล้ว
+    now = now_bangkok()
+    conn = connect_db()
+    rows = conn.execute(
+        """
+        SELECT id, building, room, end_time
+        FROM booking
+        WHERE booking_date=? AND status='active'
+        ORDER BY end_time ASC, id ASC
+        """,
+        (now.date().isoformat(),),
+    ).fetchall()
+    conn.close()
+
+    response = jsonify({
+        "ok": True,
+        "server_now": now.isoformat(timespec="seconds"),
+        "timezone": "Asia/Bangkok (UTC+7)",
+        "active_count": len(rows),
+        "active_ids": [row["id"] for row in rows],
+        "active_rooms": [f"{row['building']}::{row['room']}" for row in rows],
+    })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
+# --------------------------
+# ตรวจเวลา server สำหรับเช็กตอน deploy บน Render
+# --------------------------
+@app.route("/api/server-time")
+def server_time():
+    now = now_bangkok()
+    response = jsonify({
+        "ok": True,
+        "server_now": now.isoformat(timespec="seconds"),
+        "date": now.date().isoformat(),
+        "time": now.strftime("%H:%M:%S"),
+        "timezone": "Asia/Bangkok (UTC+7)",
+    })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+# --------------------------
+# ยกเลิกการจอง - เฉพาะเจ้าของ และใช้ POST เท่านั้น
+# --------------------------
 @app.route("/booking/<int:booking_id>/cancel", methods=["POST"])
 def cancel_booking(booking_id):
     verify_csrf()
@@ -382,7 +577,10 @@ def cancel_booking(booking_id):
 
     if row["status"] != "active":
         conn.close()
-        flash("รายการนี้ถูกยกเลิกไปแล้ว", "error")
+        if row["status"] == "completed":
+            flash("รายการนี้สิ้นสุดตามเวลาแล้ว ห้องถูกคืนเป็นว่างอัตโนมัติ", "success")
+        else:
+            flash("รายการนี้ถูกยกเลิกไปแล้ว", "error")
         return redirect(url_for("bookings"))
 
     if row["booking_date"] != today_iso():

@@ -6,7 +6,7 @@
     <div class="hero-copy">
         <span class="eyebrow">{{ icon('spark', 16) }} จองง่าย • เช็กสถานะได้ทันที</span>
         <h1>เลือกอาคาร แล้วจองห้อง<br><span>สำหรับวันนี้</span></h1>
-        <p>คิวจองจะเริ่มใหม่อัตโนมัติเมื่อขึ้นวันใหม่ โดยข้อมูลเก่ายังคงเก็บในประวัติครบถ้วน</p>
+        <p>เมื่อหมดเวลาจอง ห้องจะกลับเป็นว่างอัตโนมัติ และข้อมูลเดิมยังคงเก็บในประวัติครบถ้วน</p>
     </div>
     <div class="date-card">
         <span class="date-icon">{{ icon('calendar', 24) }}</span>
@@ -14,7 +14,7 @@
     </div>
 </section>
 
-<section class="stats-grid" aria-label="สรุปสถานะวันนี้">
+<section class="stats-grid" aria-label="สรุปสถานะวันนี้" data-active-booking-count="{{ booked_today }}"{% if nearest_release_ms %} data-auto-release-ms="{{ nearest_release_ms }}"{% endif %}>
     <div class="stat-card"><span>{{ icon('building', 20) }}</span><div><strong>{{ buildings|length }}</strong><small>อาคาร/พื้นที่</small></div></div>
     <div class="stat-card"><span>{{ icon('door', 20) }}</span><div><strong>{{ total_rooms }}</strong><small>ห้องทั้งหมด</small></div></div>
     <div class="stat-card"><span class="status-green">{{ icon('check', 20) }}</span><div><strong>{{ available_today }}</strong><small>ว่างวันนี้</small></div></div>

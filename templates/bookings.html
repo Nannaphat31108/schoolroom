@@ -17,7 +17,7 @@
     {% if active_today %}
     <div class="booking-list">
         {% for booking in active_today %}
-        <article class="booking-row {% if booking.can_cancel %}owned{% endif %}">
+        <article class="booking-row {% if booking.can_cancel %}owned{% endif %}" data-active-booking-id="{{ booking.id }}"{% if booking.release_after_ms %} data-auto-release-ms="{{ booking.release_after_ms }}"{% endif %}>
             <div class="booking-room"><span class="room-icon small">{{ icon('door', 19) }}</span><div><strong>{{ booking.room }}</strong><small>{{ booking.building }}</small></div></div>
             <div class="booking-detail"><span>{{ icon('user', 16) }}</span><div><small>ผู้จอง</small><strong>{{ booking.name }}</strong></div></div>
             <div class="booking-detail"><span>{{ icon('clock', 16) }}</span><div><small>เวลา</small><strong>{{ booking.start_time }} - {{ booking.end_time }}</strong></div></div>
