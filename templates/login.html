@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+{% from "icons.html" import icon %}
+{% block title %}เข้าสู่ระบบ | ระบบจองห้องเรียน{% endblock %}
+{% block content %}
+<div class="auth-layout">
+    <section class="form-panel">
+        <span class="summary-icon">{{ icon('lock', 24) }}</span>
+        <span class="section-kicker">ระบบจองห้องเรียน</span>
+        <h1>เข้าสู่ระบบ</h1>
+        <p class="form-lead">เข้าสู่ระบบด้วยบัญชีของคุณก่อนจองห้องเรียน</p>
+
+        <form method="POST" class="booking-form" autocomplete="on">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="next" value="{{ next_url }}">
+            <div class="field">
+                <label for="username">ชื่อผู้ใช้</label>
+                <div class="input-wrap">{{ icon('user', 18) }}<input id="username" type="text" name="username" value="{{ username }}" placeholder="ชื่อผู้ใช้" minlength="3" maxlength="50" required autofocus></div>
+            </div>
+            <div class="field">
+                <label for="password">รหัสผ่าน</label>
+                <div class="input-wrap">{{ icon('lock', 18) }}<input id="password" type="password" name="password" placeholder="รหัสผ่าน" required></div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-large btn-block">{{ icon('check', 18) }} เข้าสู่ระบบ</button>
+        </form>
+
+        <p class="auth-switch">ยังไม่มีบัญชี? <a href="{{ url_for('register') }}">สมัครสมาชิก</a></p>
+    </section>
+</div>
+{% endblock %}

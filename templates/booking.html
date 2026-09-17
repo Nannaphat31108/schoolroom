@@ -13,7 +13,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="field">
                 <label for="name">ชื่อผู้จอง</label>
-                <div class="input-wrap">{{ icon('user', 18) }}<input id="name" type="text" name="name" value="{{ request.form.get('name', '') }}" placeholder="กรอกชื่อผู้จอง" minlength="2" maxlength="100" required autofocus></div>
+                <div class="input-wrap">{{ icon('user', 18) }}<input id="name" type="text" name="name" value="{{ request.form.get('name', current_display_name or '') }}" placeholder="กรอกชื่อผู้จอง" minlength="2" maxlength="100" required autofocus></div>
             </div>
 
             <div class="two-cols">

@@ -14,7 +14,7 @@
 
 <div class="room-grid">
 {% for room in rooms %}
-    <article class="room-card {% if room.status != 'ว่าง' %}occupied{% endif %}"{% if room.status != 'ว่าง' %} data-active-room-key="{{ building }}::{{ room.room }}"{% endif %}{% if room.release_after_ms %} data-auto-release-ms="{{ room.release_after_ms }}"{% endif %}>
+    <article class="room-card {% if room.status != 'ว่าง' %}occupied{% endif %}"{% if room.reason == 'booking' %} data-active-room-key="{{ building }}::{{ room.room }}"{% endif %}{% if room.release_after_ms %} data-auto-release-ms="{{ room.release_after_ms }}"{% endif %}>
         <div class="room-card-top">
             <span class="room-icon">{{ icon('door', 21) }}</span>
             {% if room.status == "ว่าง" %}
@@ -29,6 +29,13 @@
             <a href="{{ url_for('booking', building=building, room=room.room) }}" class="btn btn-primary btn-block">
                 จองห้อง {{ icon('arrow', 17) }}
             </a>
+        {% elif room.reason == "class" %}
+            <div class="booking-meta">
+                <span>{{ icon('school', 16) }} {{ room.name }}</span>
+                <span>{{ icon('clock', 16) }} {{ room.start_time }} - {{ room.end_time }}</span>
+            </div>
+            <p class="auto-release-note">{{ icon('check', 15) }} มีคาบเรียนตามตารางสอน จะว่างเมื่อถึง {{ room.end_time }}</p>
+            <button class="btn btn-disabled btn-block" disabled>{{ icon('lock', 16) }} มีคาบเรียนอยู่</button>
         {% else %}
             <div class="booking-meta">
                 <span>{{ icon('user', 16) }} {{ room.name }}</span>

@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% from "icons.html" import icon %}
+{% block title %}สมัครสมาชิก | ระบบจองห้องเรียน{% endblock %}
+{% block content %}
+<div class="auth-layout">
+    <section class="form-panel">
+        <span class="summary-icon">{{ icon('user', 24) }}</span>
+        <span class="section-kicker">ระบบจองห้องเรียน</span>
+        <h1>สมัครสมาชิก</h1>
+        <p class="form-lead">สร้างบัญชีผู้ใช้ของคุณเพื่อเริ่มจองห้องเรียน</p>
+
+        <form method="POST" class="booking-form" autocomplete="on">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="field">
+                <label for="display_name">ชื่อ-นามสกุล</label>
+                <div class="input-wrap">{{ icon('user', 18) }}<input id="display_name" type="text" name="display_name" value="{{ display_name }}" placeholder="ชื่อที่แสดงในระบบจอง" minlength="2" maxlength="100" required autofocus></div>
+            </div>
+            <div class="field">
+                <label for="username">ชื่อผู้ใช้</label>
+                <div class="input-wrap">{{ icon('user', 18) }}<input id="username" type="text" name="username" value="{{ username }}" placeholder="a-z, 0-9, . หรือ _" minlength="3" maxlength="50" pattern="[a-zA-Z0-9_.]+" required></div>
+            </div>
+            <div class="two-cols">
+                <div class="field">
+                    <label for="password">รหัสผ่าน</label>
+                    <div class="input-wrap">{{ icon('lock', 18) }}<input id="password" type="password" name="password" placeholder="อย่างน้อย 6 ตัวอักษร" minlength="6" required></div>
+                </div>
+                <div class="field">
+                    <label for="confirm">ยืนยันรหัสผ่าน</label>
+                    <div class="input-wrap">{{ icon('lock', 18) }}<input id="confirm" type="password" name="confirm" placeholder="พิมพ์รหัสผ่านอีกครั้ง" minlength="6" required></div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-large btn-block">{{ icon('check', 18) }} สมัครสมาชิก</button>
+        </form>
+
+        <p class="auth-switch">มีบัญชีอยู่แล้ว? <a href="{{ url_for('login') }}">เข้าสู่ระบบ</a></p>
+    </section>
+</div>
+{% endblock %}
